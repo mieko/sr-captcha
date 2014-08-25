@@ -3,13 +3,13 @@ Breaking The Silk Road Captcha
 
 [Mike A. Owens](http://mike.filespanker.com/), August 24th, 2014
 
-The Silk Road, the infamous online black market, was shut down almost a year
+Silk Road, the infamous online black market, was shut down almost a year
 back.  Until moments ago, I thought it had stayed dead.  That would've made it
-easier to publish this write-up, but what the hell.
+easier to publish this write-up, but what the hell.  I just read that it is back
+in operation.  I doubt anything written here applies anymore, though.  
 
-I've just read that it's back in operation, but I doubt anything written here
-applies anymore.  Regardless, I'd like to dive into some code I wrote years ago
-that I'm particularly fond of, but obviously reluctant to put on a resumé.
+Regardless, I'd like to dive into some code I wrote years ago that I'm
+particularly fond of, but obviously reluctant to put on a resumé.
 
 
 Motivation
@@ -20,7 +20,7 @@ through an HN submission.  After jumping through a few Tor hoops, I was able to
 check out the listings.  
 
 Now, personally, I won't even take over-the-counter medications that are
-"too blue", for fear that they'll make me drowsy.  But my first thought was:
+"too blue looking", for fear that they'll make me drowsy.  But my first thought was:
 Here is a bunch of interesting, real-time, market data that's hard to access
 programmatically.
 
@@ -34,26 +34,24 @@ substances.  That's *got* to end up useful, somehow.
 No matter: I had already started imagining charts, graphs,
 and `Sr::Listing` instances.  But first I had to get this login automated.
 
-I'll be interspersing this article with, what I consider, interesting, (edited),
-snippets of code.  I won't be publishing the API package, as:
+I'll be interspersing this article with what I consider interesting, albiet edited,
+snippets of Ruby code.  I won't be publishing the API package, as:
 
   1. It probably doesn't work anymore, and I'm years removed from it.  It
      involved a lot of scraping of the site, which is always brittle.
   2. It was never really production quality, as evidenced by a lot more
      "shell outs" than I'd like.
 
-All listings are in Ruby.
-
 Tor
 ---
 The Silk Road was implemented as a TOR hidden service.  For my client API to
 connect to it and do anything useful, it has talk Tor.
 
-The Vidalia software starts a local SOCKS5 proxy when launched.  My client
-needed to configure its HTTP agents to use it.  Luckily, the
-[socksify gem](https://github.com/astro/socksify-ruby) allows me to do just
-that.  This hacky approach changes the SOCKS proxy state of every socket in the
-application after it's `auto_configure!`ed, though.
+[Vidalia](https://www.torproject.org/projects/vidalia.html.en) starts a local
+SOCKS5 proxy when launched.  My client needed to configure its HTTP agents to
+use it.  Luckily, the [socksify gem](https://github.com/astro/socksify-ruby) allows
+me to do just that.  This hacky approach changes the SOCKS proxy state of every
+socket in the application after it's `auto_configure!`ed, though.
 
 
 ```ruby
@@ -65,7 +63,6 @@ module Sr
   class TorError < RuntimeError; end
 
   class Tor
-
     # Loads the torproject test page and tests for the success message.
     # Just to be sure.
     def self.test_tor?
@@ -117,7 +114,7 @@ end
 
 ```
 
-All set.  We'll just call that early in the process.
+All set.  I'd' just call that early in the process.
 
 
 The Captcha
@@ -128,8 +125,8 @@ Now we get to the meat of the article: breaking the Silk Road Captcha.
 I had never done this before, so I thought it'd be interesting.  The following
 is the result of two, six-hour sessions of hacking after work.
 
-I planned on calling this a success if I could hit better than one-third accuracy,
-as I doubted so few fails would set off any alarms.  Also, the site session
+I planned on calling this a success if I could hit one-third accuracy.
+I doubted so few fails would set off any alarms.  Also, the site session
 would allow me to get a lot of mileage out of one successful login.
 
 I ended up being able to do a lot better than that.
@@ -162,12 +159,12 @@ There are a few obvious features of this captcha:
      information.
 
 
-I wrote a Mechanize tool that downloaded 2,000 captcha examples from the site:
-one every two seconds.  Then I solved them all by hand, renaming the files to
-*(solution)*`.jpg`.  
+I wrote a [Mechanize](http://docs.seattlerb.org/mechanize/) tool that downloaded
+2,000 captcha examples from the site: one every two seconds.  Then I solved them
+all by hand, renaming the files to *(solution)*`.jpg`.  That was not fun.
 
-That was not the most fun part of the process, but I ended up with a pretty
-decent corpus of solved captchas to train or test against.
+But I ended up with a pretty decent corpus of solved captchas to train or test
+against.
 
 
 Removing the Background
@@ -194,7 +191,7 @@ Threshold, 0.09:
 
 *Note: Images altered manually for illustration.*
 
-That corresponded to the following RMagick incantation:
+That corresponded to the following [RMagick](http://www.imagemagick.org/RMagick/doc/) incantation:
 
 ```ruby
 # Basic image processing gets us to a black and white image
@@ -263,7 +260,7 @@ We end up with something like the following:
 Awesome.
 
 I considered taking these processed images and piping them through OCR software,
-but experiments showed that approach lacking.  There was more work to do.
+but experiments showed that approach useless.  There was more work to do.
 
 
 Segmenting
@@ -312,18 +309,18 @@ This breaks up the image into segments like the following, horizontally:
 
 ![Segmented image](./images/segmented.png)
 
-And then computed each character's bounding box, to put its origin at the
+It then crops each character to its bounding box, placing its origin at the
 top-left.
 
 I ran this process over the corpus, and generated the "average" representation
-of each character, grouped by the captcha solutions I had solved by hand.  This
-ended being a good visualization for later.
+of each character, grouped by the captcha solutions I had solved.  This ended up
+being a good visualization.
 
 ![The extracted "font"](./images/font-extracted.png)
 
 Think of it as a histogram.  Darker areas are where my segmentation algorithm
 sliced the characters in such a way that they "agreed".  You can see offsets
-where the pre-processing occasioanlly allowed some things slip through the
+where the pre-processing occasioanally allowed some things slip through the
 thresholds, too.
 
 On the whole, every one is pretty readable.  As the letters came from an English
@@ -336,9 +333,9 @@ Bet you didn't know *J* was so rare.
 A Neural Network for Character Recognition
 ------------------------------------------
 There's a cool gem for Ruby called [AI4R](http://www.ai4r.org/).  It's got
-genetic algorithm implementations, Bayes classifiers, amongst other useful
-things.  As  `Ai4r::Positronic` was not available at the time, I decided to attack this
-with a neural network.
+genetic algorithm implementations, Bayes classifiers, and other useful
+things.  As  `Ai4r::Positronic` was not available at the time, I decided to attack
+this with a neural network.
 
 Basically, you start with an empty array of bits.  You *train* it with a
 pattern and a known solution: e.g.,
@@ -351,10 +348,10 @@ After enough examples, you can present a candidate pattern, and the network will
 tell you what it *probably* represents, using its training.
 
 There are some trade-offs.  The larger your bitstring, and the more elaborate
-layer configuration you use can have dramatic effects on the training runtime.
+layer configuration, the longer training takes.  This can be significant.
 
 I took each character in the corpus, cropped to 20x20, and applied a monochrome
-threshold to end up with a truly 1bpp representation, and started training.
+threshold, to end up with a 1bpp representation, and started training.
 
 ```ruby
 require 'ai4r'
@@ -408,10 +405,10 @@ module Sr
 end
 ```
 
-At this point, I modified my Mechanize tool to continue downloading captchas. Only
-this time, it tried to solve them, and got feedback by attempting a login.  
+I modified my Mechanize tool to continue downloading captchas. Only this time, it
+tried to solve them, and got feedback by attempting a login.  
 
-The ones it got correct were added to the corpus of solutions, as a way to
+The captchas it got correct were added to the corpus of solutions, as a way to
 self-reinforce its knowledge.
 
 When a login attempt failed, it saved the captcha to a directory, so that I
@@ -419,30 +416,34 @@ could solve it manually.  Once the tool noticed I had renamed the file, it
 slurped it up, and added it to the corpus to train upon.  Every now and then I'd
 solve a few dozen captchas.
 
-After a few hours of training, the per-character success rate was at 90%. Unfortunately,
-the average captcha was eight characters long, so its successful
-login rate, considering *all* characters had to be correct, was 0.90 \*\* 8, or
-43%.  The goal was already met, but this could be better.
+After a few hours of training, the per-character success rate was at 90%.
+
+Unfortunately, the average captcha was nearly eight characters long, so its
+successful *login rate*, considering *all* characters had to be correct, was
+0.90 \*\* 8, or 43%.  My initial goal had been met, but I thought it could do better.
 
 
-Abusing the Dictionary and Exploiting the Letter Frequency of the English Language
+Exploiting the Dictionary and the Letter Frequency of English
 ----------------------
-Well, the "word" part of the captcha wasn't just random letters, they were
+
+At times, the neural network would come up with a nonsense candidate.  Something
+weird that didn't match the format.  It recognized characters independently, and
+joined the results together, with no larger context.
+
+But the "word" part of the captcha wasn't just random letters, they were
 words.  Truncated words from a word list.  I have a word list, and I can
-probably build one bigger than theirs with a bit of searching:
+probably build one bigger than theirs with a bit of searching.  So I collected a
+few and generated my master word list:
 
 ```bash
 cat /usr/share/dict/words *.txt | tr A-Z a-z | grep -v '[^a-z]' \
   | cut -c1-5 | grep '...' | sort | uniq > dict5.txt
 ```
 
-Now, assuming that my `dict5.txt` will contain every possible "word" part a
-captcha solution will contain, the client will at least know when it's not even
-worth a try.
+Then, I could assume that my `dict5.txt` contained every possible "word"
+component a captcha solution would contain.  I could also consider candidates
+not in my dictionary as "weird", and get on to fixing them.
 
-The neural network came up with a candidate solution, but it's weird.  It
-doesn't fit the format, or came up with a word that's not in its list.  How many
-of those can be fixed?
 
 ```ruby
 # Returns the "word" and "number" part of a captcha separately.
@@ -472,8 +473,11 @@ def in_dict?(w)
 end
 ```
 
-The initial plan was to start looking at use the neural network's "runner up"
-answers, but something else proved far more effective.
+But how do I fix "weird" candidate solutions, and words that didn't appear in
+the dictionary?
+
+My first thought was to look into the network's "runner up" candidates.  But
+a different approach proved far more effective.
 
 Here's an interesting table:
 ```ruby
@@ -539,10 +543,10 @@ what the neural network proposed, we really want to prefer replacing a *z* befor
 a vowel.
 
 This "fix-up" step took the successful login rate from 43% to 56%.  That's when
-I considered it solved and called it day.  
+I considered it solved and called it a day.  
 
 The experiment didn't end up going much further (and I don't have that data!), but
-it was a nice stroll around quite a few problem domains.
+it was a nice stroll around a few problem domains.
 
 \- [mieko](http://mike.filespanker.com/)
 
