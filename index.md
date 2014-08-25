@@ -1,4 +1,5 @@
 ---
+layout: modernist
 ---
 
 Breaking The Silk Road Captcha
