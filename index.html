@@ -1,0 +1,590 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>sr-captcha by mieko</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="javascripts/scale.fix.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header class="without-description">
+        <h1>sr-captcha</h1>
+        <p></p>
+        <p class="view"><a href="https://github.com/mieko/sr-captcha">View the Project on GitHub <small>mieko/sr-captcha</small></a></p>
+        <ul>
+          <li><a href="https://github.com/mieko/sr-captcha/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/mieko/sr-captcha/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/mieko/sr-captcha">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h1>
+<a name="breaking-the-silk-road-captcha" class="anchor" href="#breaking-the-silk-road-captcha"><span class="octicon octicon-link"></span></a>Breaking The Silk Road Captcha</h1>
+
+<p><a href="http://mike.filespanker.com/">Mike A. Owens</a>, August 24th, 2014</p>
+
+<p>The Silk Road, the infamous online black market, was shut down almost a year
+back.  Until moments ago, I thought it had stayed dead.  That would've made it
+easier to publish this write-up, but what the hell.</p>
+
+<p>I've just read that it's back in operation, but I doubt anything written here
+applies anymore.  Regardless, I'd like to dive into some code I wrote years ago
+that I'm particularly fond of, but obviously reluctant to put on a resumé.</p>
+
+<h2>
+<a name="motivation" class="anchor" href="#motivation"><span class="octicon octicon-link"></span></a>Motivation</h2>
+
+<p>I first heard of The Silk Road via
+<a href="http://www.gwern.net/Silk%20Road">gwern's writings</a> on the subject, probably
+through an HN submission.  After jumping through a few Tor hoops, I was able to
+check out the listings.  </p>
+
+<p>Now, personally, I won't even take over-the-counter medications that are
+"too blue", for fear that they'll make me drowsy.  But my first thought was:
+Here is a bunch of interesting, real-time, market data that's hard to access
+programmatically.</p>
+
+<p>A <a href="http://en.wikipedia.org/wiki/Drugwars">Drug Wars</a> with real-time price updates?  </p>
+
+<p>A market ticker that tells you <code>MJ ▲0.21</code>, <code>COKE ▼3.53</code>?</p>
+
+<p>Over time, I could collect a huge amount of historical pricing data for illicit
+substances.  That's <em>got</em> to end up useful, somehow.  </p>
+
+<p>No matter: I had already started imagining charts, graphs,
+and <code>Sr::Listing</code> instances.  But first I had to get this login automated.</p>
+
+<p>I'll be interspersing this article with, what I consider, interesting, (edited),
+snippets of code.  I won't be publishing the API package, as:</p>
+
+<ol>
+<li>It probably doesn't work anymore, and I'm years removed from it.  It
+ involved a lot of scraping of the site, which is always brittle.</li>
+<li>It was never really production quality, as evidenced by a lot more
+ "shell outs" than I'd like.</li>
+</ol><p>All listings are in Ruby.</p>
+
+<h2>
+<a name="tor" class="anchor" href="#tor"><span class="octicon octicon-link"></span></a>Tor</h2>
+
+<p>The Silk Road was implemented as a TOR hidden service.  For my client API to
+connect to it and do anything useful, it has talk Tor.</p>
+
+<p>The Vidalia software starts a local SOCKS5 proxy when launched.  My client
+needed to configure its HTTP agents to use it.  Luckily, the
+<a href="https://github.com/astro/socksify-ruby">socksify gem</a> allows me to do just
+that.  This hacky approach changes the SOCKS proxy state of every socket in the
+application after it's <code>auto_configure!</code>ed, though.</p>
+
+<div class="highlight highlight-ruby"><pre><span class="nb">require</span> <span class="s1">'socksify'</span>
+<span class="nb">require</span> <span class="s1">'socksify/http'</span>
+
+<span class="k">module</span> <span class="nn">Sr</span>
+
+  <span class="k">class</span> <span class="nc">TorError</span> <span class="o">&lt;</span> <span class="no">RuntimeError</span><span class="p">;</span> <span class="k">end</span>
+
+  <span class="k">class</span> <span class="nc">Tor</span>
+
+    <span class="c1"># Loads the torproject test page and tests for the success message.</span>
+    <span class="c1"># Just to be sure.</span>
+    <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">test_tor?</span>
+      <span class="n">uri</span> <span class="o">=</span> <span class="s1">'https://check.torproject.org/?lang=en-US'</span>
+      <span class="k">begin</span>
+        <span class="n">page</span> <span class="o">=</span> <span class="no">Net</span><span class="o">::</span><span class="no">HTTP</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="no">URI</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">uri</span><span class="p">))</span>
+        <span class="k">return</span> <span class="kp">true</span> <span class="k">if</span> <span class="n">page</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sr">/browser is configured to use Tor/i</span><span class="p">)</span>
+      <span class="k">rescue</span>
+        <span class="p">;</span>
+      <span class="k">end</span>
+
+      <span class="kp">false</span>
+    <span class="k">end</span>
+
+
+    <span class="c1"># Our use case has the Tor SOCKS5 proxy running locally.  On unix, we use</span>
+    <span class="c1"># `lsof` to see the ports `tor` is listening on.</span>
+    <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">find_tor_ports</span>
+      <span class="nb">p</span> <span class="o">=</span> <span class="sb">`lsof -i tcp | grep "^tor" | grep "\(LISTEN\)"`</span>
+      <span class="nb">p</span><span class="o">.</span><span class="n">each_line</span><span class="o">.</span><span class="n">map</span> <span class="k">do</span> <span class="o">|</span><span class="n">l</span><span class="o">|</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">l</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sr">/localhost:([0-9]+) /</span><span class="p">)</span>
+        <span class="n">m</span><span class="o">[</span><span class="mi">1</span><span class="o">].</span><span class="n">to_i</span>
+      <span class="k">end</span>
+    <span class="k">end</span>
+
+
+    <span class="c1"># Configures future connections to use the Tor proxy, or raises TorError</span>
+    <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">auto_configure!</span>
+      <span class="k">return</span> <span class="kp">true</span> <span class="k">if</span> <span class="vi">@configured</span>
+
+      <span class="no">TCPSocket</span><span class="o">::</span><span class="n">socks_server</span> <span class="o">=</span> <span class="s1">'localhost'</span>
+
+      <span class="n">ports</span> <span class="o">=</span> <span class="n">find_tor_ports</span>
+
+      <span class="n">ports</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="nb">p</span><span class="o">|</span>
+        <span class="no">TCPSocket</span><span class="o">::</span><span class="n">socks_port</span> <span class="o">=</span> <span class="nb">p</span>
+        <span class="k">if</span> <span class="n">test_tor?</span>
+          <span class="vi">@configured</span> <span class="o">=</span> <span class="kp">true</span>
+          <span class="k">return</span> <span class="kp">true</span>
+        <span class="k">end</span>
+      <span class="k">end</span>
+
+      <span class="no">TCPSocket</span><span class="o">::</span><span class="n">socks_server</span> <span class="o">=</span> <span class="kp">nil</span>
+      <span class="no">TCPSocket</span><span class="o">::</span><span class="n">socks_port</span> <span class="o">=</span> <span class="kp">nil</span>
+      <span class="nb">fail</span> <span class="no">TorError</span><span class="p">,</span> <span class="s2">"SOCKS5 connection failed; ports: </span><span class="si">#{</span><span class="n">ports</span><span class="si">}</span><span class="s2">"</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+
+</pre></div>
+
+<p>All set.  We'll just call that early in the process.</p>
+
+<h2>
+<a name="the-captcha" class="anchor" href="#the-captcha"><span class="octicon octicon-link"></span></a>The Captcha</h2>
+
+<p>Now we get to the meat of the article: breaking the Silk Road Captcha.  </p>
+
+<p>I had never done this before, so I thought it'd be interesting.  The following
+is the result of two, six-hour sessions of hacking after work.</p>
+
+<p>I planned on calling this a success if I could hit better than one-third accuracy,
+as I doubted so few fails would set off any alarms.  Also, the site session
+would allow me to get a lot of mileage out of one successful login.</p>
+
+<p>I ended up being able to do a lot better than that.</p>
+
+<p>Because the Silk Road developers had to be paranoid, they couldn't use an
+external captcha service like ReCaptcha.  I'm not sure if the solution they used
+was hand-rolled, or if they employed a third-party library, but lets give it a
+look:</p>
+
+<p><img src="./images/compa440.jpg" alt="compa440"></p>
+
+<p><img src="./images/kingp176.jpg" alt="kingp176"></p>
+
+<p><img src="./images/lux90.jpg" alt="lux90"></p>
+
+<p><img src="./images/overt775.jpg" alt="overt775"></p>
+
+<p><img src="./images/rompi4.jpg" alt="rompi4"></p>
+
+<p>There are a few obvious features of this captcha:</p>
+
+<ol>
+<li>A regular format: a dictionary word, truncated to at most five
+ characters, followed by an integer between 0 and 999.</li>
+<li>The font doesn't change, ever.</li>
+<li>Each character can be at any position on the Y axis.</li>
+<li>Each character can be rotated, but seemingly only a few degrees.</li>
+<li>The background is some sort of spiral, which doesn't contrast too much
+ with the lettering.</li>
+<li>They're all awfully pink, so there's effectively one channel of color
+ information.</li>
+</ol><p>I wrote a Mechanize tool that downloaded 2,000 captcha examples from the site:
+one every two seconds.  Then I solved them all by hand, renaming the files to
+<em>(solution)</em><code>.jpg</code>.  </p>
+
+<p>That was not the most fun part of the process, but I ended up with a pretty
+decent corpus of solved captchas to train or test against.</p>
+
+<h2>
+<a name="removing-the-background" class="anchor" href="#removing-the-background"><span class="octicon octicon-link"></span></a>Removing the Background</h2>
+
+<p>As good a place as any to start.  In this step, I want to end up with a
+grayscale image, containing (mostly) only the characters, with the "noise"
+removed.</p>
+
+<p>Using The Gimp, I played around with a few effects, and a few different orders
+of effects.  It took some tweaking and trial and error, but here's what I ended
+up with:</p>
+
+<p>Original:</p>
+
+<p><img src="./images/compa440.jpg" alt="Original"></p>
+
+<p>Equalized:</p>
+
+<p><img src="./images/equalized.png" alt="Equalized"></p>
+
+<p>Threshold, 0.09:</p>
+
+<p><img src="./images/threshold.png" alt="Threshold"></p>
+
+<p><em>Note: Images altered manually for illustration.</em></p>
+
+<p>That corresponded to the following RMagick incantation:</p>
+
+<div class="highlight highlight-ruby"><pre><span class="c1"># Basic image processing gets us to a black and white image</span>
+<span class="c1"># with most background removed</span>
+<span class="k">def</span> <span class="nf">remove_background</span><span class="p">(</span><span class="n">im</span><span class="p">)</span>
+  <span class="n">im</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">equalize</span>
+  <span class="n">im</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">threshold</span><span class="p">(</span><span class="no">Magick</span><span class="o">::</span><span class="no">MaxRGB</span> <span class="o">*</span> <span class="mi">0</span><span class="o">.</span><span class="mi">09</span><span class="p">)</span>
+
+  <span class="c1"># the above processing leaves a black border.  Remove it.</span>
+  <span class="n">im</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">trim</span> <span class="s1">'#000'</span>
+  <span class="n">im</span>
+<span class="k">end</span>
+</pre></div>
+
+<p>That cleaned us up a lot, but there are still a lot of "speckles" left: little
+one-pixel islands that can catch us up later, let's get rid of those:</p>
+
+<div class="highlight highlight-ruby"><pre><span class="c1"># Consider a pixel "black enough"?  In a grayscale sense.</span>
+<span class="k">def</span> <span class="nf">black?</span><span class="p">(</span><span class="nb">p</span><span class="p">)</span>
+  <span class="k">return</span> <span class="nb">p</span><span class="o">.</span><span class="n">intensity</span> <span class="o">==</span> <span class="mi">0</span> <span class="o">||</span> <span class="p">(</span><span class="no">Magick</span><span class="o">::</span><span class="no">MaxRGB</span><span class="o">.</span><span class="n">to_f</span> <span class="o">/</span> <span class="nb">p</span><span class="o">.</span><span class="n">intensity</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="o">.</span><span class="mi">5</span>
+<span class="k">end</span>
+
+
+<span class="c1"># True iff [x,y] is a valid pixel coordinate in the image</span>
+<span class="k">def</span> <span class="nf">in_bounds?</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">x</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">y</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">im</span><span class="o">.</span><span class="n">columns</span> <span class="o">&amp;&amp;</span> <span class="n">y</span> <span class="o">&lt;</span> <span class="n">im</span><span class="o">.</span><span class="n">rows</span>
+<span class="k">end</span>
+
+
+<span class="c1"># Returns new image with single-pixel "islands" removed,</span>
+<span class="c1">#   see: Conway's game of life.</span>
+<span class="k">def</span> <span class="nf">despeckle</span><span class="p">(</span><span class="n">im</span><span class="p">)</span>
+  <span class="n">xydeltas</span> <span class="o">=</span> <span class="o">[[-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="o">]</span><span class="p">,</span>  <span class="o">[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="o">]</span><span class="p">,</span> <span class="o">[+</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="o">]</span><span class="p">,</span>
+              <span class="o">[-</span><span class="mi">1</span><span class="p">,</span>  <span class="mi">0</span><span class="o">]</span><span class="p">,</span>           <span class="o">[+</span><span class="mi">1</span><span class="p">,</span>  <span class="mi">0</span><span class="o">]</span><span class="p">,</span>
+              <span class="o">[-</span><span class="mi">1</span><span class="p">,</span> <span class="o">+</span><span class="mi">1</span><span class="o">]</span><span class="p">,</span>  <span class="o">[</span><span class="mi">0</span><span class="p">,</span> <span class="o">+</span><span class="mi">1</span><span class="o">]</span><span class="p">,</span> <span class="o">[+</span><span class="mi">1</span><span class="p">,</span> <span class="o">+</span><span class="mi">1</span><span class="o">]]</span>
+
+  <span class="n">j</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">dup</span>
+  <span class="n">j</span><span class="o">.</span><span class="n">each_pixel</span> <span class="k">do</span> <span class="o">|</span><span class="nb">p</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">|</span>
+    <span class="k">if</span> <span class="n">black?</span><span class="p">(</span><span class="nb">p</span><span class="p">)</span>
+      <span class="n">island</span> <span class="o">=</span> <span class="kp">true</span>
+
+      <span class="n">xydeltas</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">dx2</span><span class="p">,</span> <span class="n">dy2</span><span class="o">|</span>
+        <span class="k">if</span> <span class="n">in_bounds?</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">x</span> <span class="o">+</span> <span class="n">dx2</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">dy2</span><span class="p">)</span> <span class="o">&amp;&amp;</span>
+            <span class="n">black?</span><span class="p">(</span><span class="n">j</span><span class="o">.</span><span class="n">pixel_color</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="n">dx2</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">dy2</span><span class="p">))</span>
+          <span class="n">island</span> <span class="o">=</span> <span class="kp">false</span>
+          <span class="k">break</span>
+        <span class="k">end</span>
+      <span class="k">end</span>
+
+      <span class="n">im</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">color_point</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="s1">'#fff'</span><span class="p">)</span> <span class="k">if</span> <span class="n">island</span>
+
+    <span class="k">end</span>
+  <span class="k">end</span>
+
+  <span class="n">im</span>
+<span class="k">end</span>
+</pre></div>
+
+<p>We end up with something like the following:</p>
+
+<p><img src="./images/despeckled.png" alt="Final Processed Image"></p>
+
+<p>Awesome.</p>
+
+<p>I considered taking these processed images and piping them through OCR software,
+but experiments showed that approach lacking.  There was more work to do.</p>
+
+<h2>
+<a name="segmenting" class="anchor" href="#segmenting"><span class="octicon octicon-link"></span></a>Segmenting</h2>
+
+<p>Now I want to slice the image up into a list of bitmaps, each holding one
+character.  We travel the image, left to right, looking for blank columns.</p>
+
+<div class="highlight highlight-ruby"><pre><span class="c1"># returns true if column "x" is blank (non-black)</span>
+<span class="k">def</span> <span class="nf">blank_column?</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+  <span class="p">(</span><span class="mi">0</span> <span class="o">.</span><span class="n">.</span><span class="o">.</span> <span class="n">im</span><span class="o">.</span><span class="n">rows</span><span class="p">)</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">y</span><span class="o">|</span>
+    <span class="k">return</span> <span class="kp">false</span> <span class="k">if</span> <span class="n">black?</span><span class="p">(</span><span class="n">im</span><span class="o">.</span><span class="n">pixel_color</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+  <span class="k">end</span>
+
+  <span class="kp">true</span>
+<span class="k">end</span>
+
+<span class="c1"># finds columns of white, and splits the image into characters, yielding each</span>
+<span class="k">def</span> <span class="nf">each_segmented_character</span><span class="p">(</span><span class="n">im</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">enum_for</span><span class="p">(</span><span class="n">__method__</span><span class="p">,</span> <span class="n">im</span><span class="p">)</span> <span class="k">unless</span> <span class="nb">block_given?</span>
+
+  <span class="n">st</span> <span class="o">=</span> <span class="mi">0</span>
+  <span class="n">x</span>  <span class="o">=</span> <span class="mi">0</span>
+  <span class="k">while</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">im</span><span class="o">.</span><span class="n">columns</span>
+    <span class="c1"># Zoom over to the first non-blank column</span>
+    <span class="n">x</span> <span class="o">+=</span> <span class="mi">1</span> <span class="k">while</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">im</span><span class="o">.</span><span class="n">columns</span> <span class="o">&amp;&amp;</span> <span class="n">blank_column?</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+
+    <span class="c1"># That's now our starting point.</span>
+    <span class="n">st</span> <span class="o">=</span> <span class="n">x</span>
+
+    <span class="c1"># Zoom over to the next blank column, or end of the image.</span>
+    <span class="n">x</span> <span class="o">+=</span> <span class="mi">1</span> <span class="k">while</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="n">im</span><span class="o">.</span><span class="n">columns</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="o">!</span><span class="n">blank_column?</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="o">||</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">st</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">))</span>
+
+    <span class="c1"># slivers smaller than this can't possibly work: it's noise.</span>
+    <span class="k">if</span> <span class="n">x</span> <span class="o">-</span> <span class="n">st</span> <span class="o">&gt;=</span> <span class="mi">4</span>
+      <span class="c1"># The crop/trim here also removes vertical whitespace, which puts the</span>
+      <span class="c1"># resulting bitmap into its minimal bounding box.</span>
+      <span class="k">yield</span> <span class="n">im</span><span class="o">.</span><span class="n">crop</span><span class="p">(</span><span class="n">st</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">x</span> <span class="o">-</span> <span class="n">st</span><span class="p">,</span> <span class="n">im</span><span class="o">.</span><span class="n">rows</span><span class="p">)</span><span class="o">.</span><span class="n">trim</span><span class="p">(</span><span class="s1">'#fff'</span><span class="p">)</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+
+</pre></div>
+
+<p>This breaks up the image into segments like the following, horizontally:</p>
+
+<p><img src="./images/segmented.png" alt="Segmented image"></p>
+
+<p>And then computed each character's bounding box, to put its origin at the
+top-left.</p>
+
+<p>I ran this process over the corpus, and generated the "average" representation
+of each character, grouped by the captcha solutions I had solved by hand.  This
+ended being a good visualization for later.</p>
+
+<p><img src="./images/font-extracted.png" alt='The extracted "font"'></p>
+
+<p>Think of it as a histogram.  Darker areas are where my segmentation algorithm
+sliced the characters in such a way that they "agreed".  You can see offsets
+where the pre-processing occasioanlly allowed some things slip through the
+thresholds, too.</p>
+
+<p>On the whole, every one is pretty readable.  As the letters came from an English
+dictionary, common letters are better represented (darker) than those that occur
+less frequently in the language.  I use this to my advantage later.</p>
+
+<p>Bet you didn't know <em>J</em> was so rare.</p>
+
+<h2>
+<a name="a-neural-network-for-character-recognition" class="anchor" href="#a-neural-network-for-character-recognition"><span class="octicon octicon-link"></span></a>A Neural Network for Character Recognition</h2>
+
+<p>There's a cool gem for Ruby called <a href="http://www.ai4r.org/">AI4R</a>.  It's got
+genetic algorithm implementations, Bayes classifiers, amongst other useful
+things.  As  <code>Ai4r::Positronic</code> was not available at the time, I decided to attack this
+with a neural network.</p>
+
+<p>Basically, you start with an empty array of bits.  You <em>train</em> it with a
+pattern and a known solution: e.g.,</p>
+
+<ul>
+<li>"This pattern represents an <em>a</em>.",</li>
+<li>"This different pattern also represents an <em>a</em>."<br>
+</li>
+<li>"This pattern represents a <em>b</em>."</li>
+</ul><p>After enough examples, you can present a candidate pattern, and the network will
+tell you what it <em>probably</em> represents, using its training.</p>
+
+<p>There are some trade-offs.  The larger your bitstring, and the more elaborate
+layer configuration you use can have dramatic effects on the training runtime.</p>
+
+<p>I took each character in the corpus, cropped to 20x20, and applied a monochrome
+threshold to end up with a truly 1bpp representation, and started training.</p>
+
+<div class="highlight highlight-ruby"><pre><span class="nb">require</span> <span class="s1">'ai4r'</span>
+<span class="nb">require</span> <span class="s1">'RMagick'</span>
+
+<span class="k">module</span> <span class="nn">Sr</span>
+  <span class="k">class</span> <span class="nc">Brain</span>
+    <span class="k">def</span> <span class="nf">initialize</span>
+      <span class="vi">@keys</span>  <span class="o">=</span> <span class="o">*</span><span class="p">((</span><span class="s1">'a'</span><span class="o">.</span><span class="n">.</span><span class="s1">'z'</span><span class="p">)</span><span class="o">.</span><span class="n">to_a</span> <span class="o">+</span> <span class="p">(</span><span class="s1">'0'</span><span class="o">.</span><span class="n">.</span><span class="s1">'9'</span><span class="p">)</span><span class="o">.</span><span class="n">to_a</span><span class="p">)</span>
+      <span class="vi">@ai</span> <span class="o">=</span> <span class="no">Ai4r</span><span class="o">::</span><span class="no">NeuralNetwork</span><span class="o">::</span><span class="no">Backpropagation</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="o">[</span><span class="no">GRID_SIZE</span> <span class="o">*</span> <span class="no">GRID_SIZE</span><span class="p">,</span>
+                                                      <span class="vi">@keys</span><span class="o">.</span><span class="n">size</span><span class="o">]</span><span class="p">)</span>
+    <span class="k">end</span>
+
+    <span class="c1"># Returns a flat array of 0 or 1 from the image data, suitable for</span>
+    <span class="c1"># feeding into the neural network</span>
+    <span class="k">def</span> <span class="nf">to_data</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+      <span class="c1"># New image of our actual grid size, then paste it over</span>
+      <span class="n">padded</span> <span class="o">=</span> <span class="no">Magick</span><span class="o">::</span><span class="no">Image</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="no">GRID_SIZE</span><span class="p">,</span> <span class="no">GRID_SIZE</span><span class="p">)</span>
+      <span class="n">padded</span> <span class="o">=</span> <span class="n">padded</span><span class="o">.</span><span class="n">composite</span><span class="p">(</span><span class="n">image</span><span class="p">,</span>
+                                <span class="no">Magick</span><span class="o">::</span><span class="no">NorthWestGravity</span><span class="p">,</span>
+                                <span class="no">Magick</span><span class="o">::</span><span class="no">MultiplyCompositeOp</span><span class="p">)</span>
+
+      <span class="n">padded</span><span class="o">.</span><span class="n">get_pixels</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">padded</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">padded</span><span class="o">.</span><span class="n">rows</span><span class="p">)</span><span class="o">.</span><span class="n">map</span> <span class="k">do</span> <span class="o">|</span><span class="nb">p</span><span class="o">|</span>
+        <span class="no">ImageProcessor</span><span class="o">.</span><span class="n">black?</span><span class="p">(</span><span class="nb">p</span><span class="p">)</span> <span class="p">?</span> <span class="mi">1</span> <span class="p">:</span> <span class="mi">0</span>
+      <span class="k">end</span>
+    <span class="k">end</span>
+
+    <span class="c1"># Feed this a positive example, e.g., train('a', image)</span>
+    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="n">char</span><span class="p">,</span> <span class="n">image</span><span class="p">)</span>
+      <span class="n">outputs</span> <span class="o">=</span> <span class="o">[</span><span class="mi">0</span><span class="o">]</span> <span class="o">*</span> <span class="vi">@keys</span><span class="o">.</span><span class="n">length</span>
+      <span class="n">outputs</span><span class="o">[</span> <span class="vi">@keys</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">char</span><span class="p">)</span> <span class="o">]</span> <span class="o">=</span> <span class="mi">1</span><span class="o">.</span><span class="mi">0</span>
+      <span class="vi">@ai</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">to_data</span><span class="p">(</span><span class="n">image</span><span class="p">),</span> <span class="n">outputs</span><span class="p">)</span>
+    <span class="k">end</span>
+
+    <span class="c1"># Return all guesses, e.g., {'a' =&gt; 0.01, 'b' =&gt; '0.2', ...}</span>
+    <span class="k">def</span> <span class="nf">classify_all</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+      <span class="n">results</span> <span class="o">=</span> <span class="vi">@ai</span><span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="n">to_data</span><span class="p">(</span><span class="n">image</span><span class="p">))</span>
+      <span class="n">r</span> <span class="o">=</span> <span class="p">{}</span>
+      <span class="vi">@keys</span><span class="o">.</span><span class="n">each</span><span class="o">.</span><span class="n">with_index</span> <span class="k">do</span> <span class="o">|</span><span class="n">v</span><span class="p">,</span> <span class="n">i</span><span class="o">|</span>
+        <span class="n">r</span><span class="o">[</span><span class="n">v</span><span class="o">]</span> <span class="o">=</span> <span class="n">results</span><span class="o">[</span><span class="n">i</span><span class="o">]</span>
+      <span class="k">end</span>
+      <span class="n">r</span>
+    <span class="k">end</span>
+
+    <span class="c1"># Returns best guess</span>
+    <span class="k">def</span> <span class="nf">classify</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+      <span class="n">res</span> <span class="o">=</span> <span class="vi">@ai</span><span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="n">to_data</span><span class="p">(</span><span class="n">image</span><span class="p">))</span>
+      <span class="vi">@keys</span><span class="o">[</span><span class="n">res</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">max</span><span class="p">)</span><span class="o">]</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+</pre></div>
+
+<p>At this point, I modified my Mechanize tool to continue downloading captchas. Only
+this time, it tried to solve them, and got feedback by attempting a login.  </p>
+
+<p>The ones it got correct were added to the corpus of solutions, as a way to
+self-reinforce its knowledge.</p>
+
+<p>When a login attempt failed, it saved the captcha to a directory, so that I
+could solve it manually.  Once the tool noticed I had renamed the file, it
+slurped it up, and added it to the corpus to train upon.  Every now and then I'd
+solve a few dozen captchas.</p>
+
+<p>After a few hours of training, the per-character success rate was at 90%. Unfortunately,
+the average captcha was eight characters long, so its successful
+login rate, considering <em>all</em> characters had to be correct, was 0.90 ** 8, or
+43%.  The goal was already met, but this could be better.</p>
+
+<h2>
+<a name="abusing-the-dictionary-and-exploiting-the-letter-frequency-of-the-english-language" class="anchor" href="#abusing-the-dictionary-and-exploiting-the-letter-frequency-of-the-english-language"><span class="octicon octicon-link"></span></a>Abusing the Dictionary and Exploiting the Letter Frequency of the English Language</h2>
+
+<p>Well, the "word" part of the captcha wasn't just random letters, they were
+words.  Truncated words from a word list.  I have a word list, and I can
+probably build one bigger than theirs with a bit of searching:</p>
+
+<div class="highlight highlight-bash"><pre>cat /usr/share/dict/words *.txt <span class="p">|</span> tr A-Z a-z <span class="p">|</span> grep -v <span class="s1">'[^a-z]'</span> <span class="se">\</span>
+  <span class="p">|</span> cut -c1-5 <span class="p">|</span> grep <span class="s1">'...'</span> <span class="p">|</span> sort <span class="p">|</span> uniq &gt; dict5.txt
+</pre></div>
+
+<p>Now, assuming that my <code>dict5.txt</code> will contain every possible "word" part a
+captcha solution will contain, the client will at least know when it's not even
+worth a try.</p>
+
+<p>The neural network came up with a candidate solution, but it's weird.  It
+doesn't fit the format, or came up with a word that's not in its list.  How many
+of those can be fixed?</p>
+
+<div class="highlight highlight-ruby"><pre><span class="c1"># Returns the "word" and "number" part of a captcha separately.</span>
+<span class="c1"># "word" takes the longest possible match</span>
+<span class="k">def</span> <span class="nf">split_word</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+  <span class="n">s</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sr">/(.+?)?(\d+)?\z/</span><span class="o">.</span><span class="n">to_a</span><span class="o">.</span><span class="n">last</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="k">rescue</span> <span class="o">[</span><span class="kp">nil</span><span class="p">,</span> <span class="kp">nil</span><span class="o">]</span>
+<span class="k">end</span>
+
+<span class="k">def</span> <span class="nf">weird_word?</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+  <span class="n">w</span><span class="p">,</span> <span class="n">d</span> <span class="o">=</span> <span class="n">split_word</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+
+  <span class="c1"># nothing matched?</span>
+  <span class="k">return</span> <span class="kp">true</span> <span class="k">if</span> <span class="n">w</span><span class="o">.</span><span class="n">nil?</span> <span class="o">||</span> <span class="n">d</span><span class="o">.</span><span class="n">nil?</span>
+
+  <span class="c1"># Digit in word part?, Too long?</span>
+  <span class="k">return</span> <span class="kp">true</span> <span class="k">if</span> <span class="n">w</span><span class="o">.</span><span class="n">match</span> <span class="sr">/\d/</span> <span class="o">||</span> <span class="n">w</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">5</span>
+
+  <span class="c1"># Too many digits?</span>
+  <span class="k">return</span> <span class="kp">true</span> <span class="k">if</span> <span class="n">d</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">3</span>
+
+  <span class="c1"># Yay</span>
+  <span class="k">return</span> <span class="kp">false</span>
+<span class="k">end</span>
+
+<span class="k">def</span> <span class="nf">in_dict?</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
+  <span class="k">return</span> <span class="n">dict</span><span class="o">.</span><span class="n">bsearch</span> <span class="p">{</span> <span class="o">|</span><span class="nb">p</span><span class="o">|</span> <span class="nb">p</span> <span class="o">&gt;=</span> <span class="n">w</span> <span class="p">}</span> <span class="o">==</span> <span class="n">w</span>
+<span class="k">end</span>
+</pre></div>
+
+<p>The initial plan was to start looking at use the neural network's "runner up"
+answers, but something else proved far more effective.</p>
+
+<p>Here's an interesting table:</p>
+
+<div class="highlight highlight-ruby"><pre><span class="c1"># a-z English text letter frequency, according to Wikipedia</span>
+<span class="no">LETTER_FREQ</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="ss">a</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mi">08167</span><span class="p">,</span> <span class="ss">b</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">014</span><span class="mi">92</span><span class="p">,</span> <span class="ss">c</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">027</span><span class="mi">82</span><span class="p">,</span> <span class="ss">d</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">04253</span><span class="p">,</span> <span class="ss">e</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mi">12702</span><span class="p">,</span> <span class="ss">f</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">0222</span><span class="mi">8</span><span class="p">,</span>
+  <span class="ss">g</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">02015</span><span class="p">,</span> <span class="ss">h</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">060</span><span class="mi">94</span><span class="p">,</span> <span class="ss">i</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">06</span><span class="mi">966</span><span class="p">,</span> <span class="ss">j</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">00153</span><span class="p">,</span> <span class="ss">k</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">00772</span><span class="p">,</span> <span class="ss">l</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">04025</span><span class="p">,</span>
+  <span class="ss">m</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">02406</span><span class="p">,</span> <span class="ss">n</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">0674</span><span class="mi">9</span><span class="p">,</span> <span class="ss">o</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">07507</span><span class="p">,</span> <span class="nb">p</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">01</span><span class="mi">929</span><span class="p">,</span> <span class="ss">q</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">000</span><span class="mi">95</span><span class="p">,</span> <span class="ss">r</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">05</span><span class="mi">987</span><span class="p">,</span>
+  <span class="ss">s</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">06327</span><span class="p">,</span> <span class="ss">t</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mi">09056</span><span class="p">,</span> <span class="ss">u</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">0275</span><span class="mi">8</span><span class="p">,</span> <span class="ss">v</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">00</span><span class="mi">978</span><span class="p">,</span> <span class="ss">w</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">02360</span><span class="p">,</span> <span class="ss">x</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">00150</span><span class="p">,</span>
+  <span class="ss">y</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">01</span><span class="mi">974</span><span class="p">,</span> <span class="ss">z</span><span class="p">:</span> <span class="mi">0</span><span class="o">.</span><span class="mo">00074</span>
+<span class="p">}</span>
+
+</pre></div>
+
+<p>Notice our poor under-represented <em>J</em> again?</p>
+
+<p>Peter Norvig has a useful article, <a href="http://norvig.com/spell-correct.html">How to Write a Spelling Corrector</a>.  I
+had a dictionary and a probably-mispelled word.  So lets try it, with a twist:</p>
+
+<div class="highlight highlight-ruby"><pre><span class="c1"># This finds every dictionary entry that is a single replacement away from</span>
+<span class="c1"># word.  It returns in a clever priority: it tries to replace digits first,</span>
+<span class="c1"># then the alphabet, in z..e (frequency) order. As we're just focusing on the</span>
+<span class="c1"># "word" part, "9" is most definitely a mistake, and "z" is more likely a</span>
+<span class="c1"># mistake than "e".</span>
+
+<span class="k">def</span> <span class="nf">edit1</span><span class="p">(</span><span class="n">word</span><span class="p">)</span>
+  <span class="c1"># Inverse frequency, "zq...e"</span>
+  <span class="n">letter_freq</span> <span class="o">=</span> <span class="no">LETTER_FREQ</span><span class="o">.</span><span class="n">sort_by</span> <span class="p">{</span> <span class="o">|</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="o">|</span> <span class="n">v</span> <span class="p">}</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="o">&amp;</span><span class="ss">:first</span><span class="p">)</span><span class="o">.</span><span class="n">join</span>
+
+  <span class="c1"># Total replacement priority: 0..9zq..e</span>
+  <span class="n">replacement_priority</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'0'</span><span class="o">.</span><span class="n">.</span><span class="s1">'9'</span><span class="p">)</span><span class="o">.</span><span class="n">to_a</span><span class="o">.</span><span class="n">join</span> <span class="o">+</span> <span class="n">letter_freq</span>
+
+  <span class="c1"># Generate splits, tagged with the priority, then sort them so</span>
+  <span class="c1"># the splits on least-frequent english characters get processed first</span>
+  <span class="n">splits</span> <span class="o">=</span> <span class="n">word</span><span class="o">.</span><span class="n">each_char</span><span class="o">.</span><span class="n">with_index</span><span class="o">.</span><span class="n">map</span> <span class="k">do</span> <span class="o">|</span><span class="n">c</span><span class="p">,</span> <span class="n">i</span><span class="o">|</span>
+    <span class="c1"># Replace what we're looking for with a space</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">word</span><span class="o">.</span><span class="n">dup</span><span class="p">;</span>
+    <span class="n">w</span><span class="o">[</span><span class="n">i</span><span class="o">]</span> <span class="o">=</span> <span class="s1">' '</span>
+    <span class="o">[</span><span class="n">replacement_priority</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">c</span><span class="p">),</span> <span class="n">w</span><span class="o">]</span>
+  <span class="k">end</span>
+  <span class="n">splits</span><span class="o">.</span><span class="n">sort_by!</span><span class="p">{</span><span class="o">|</span><span class="n">k</span><span class="p">,</span><span class="n">v</span><span class="o">|</span> <span class="n">k</span><span class="p">}</span><span class="o">.</span><span class="n">map!</span><span class="p">(</span><span class="o">&amp;</span><span class="ss">:last</span><span class="p">)</span>
+
+  <span class="c1"># Keep up with results so we don't end up with duplicates</span>
+  <span class="n">yielded</span> <span class="o">=</span> <span class="o">[]</span>
+  <span class="n">splits</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">w</span><span class="o">|</span>
+    <span class="n">letter_freq</span><span class="o">.</span><span class="n">each_char</span> <span class="k">do</span> <span class="o">|</span><span class="n">c</span><span class="o">|</span>
+      <span class="n">candidate</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s1">' '</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+      <span class="k">next</span> <span class="k">if</span> <span class="n">yielded</span><span class="o">.</span><span class="n">include?</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
+
+      <span class="k">if</span> <span class="n">in_dict?</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
+        <span class="n">yielded</span><span class="o">.</span><span class="n">push</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
+        <span class="k">yield</span> <span class="n">candidate</span>
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+</pre></div>
+
+<p>The big trick here is the replacement order.  Using the table of letter
+frequencies, and the list of valid dictionary words that are one edit away from
+what the neural network proposed, we really want to prefer replacing a <em>z</em> before
+a vowel.</p>
+
+<p>This "fix-up" step took the successful login rate from 43% to 56%.  That's when
+I considered it solved and called it day.  </p>
+
+<p>The experiment didn't end up going much further (and I don't have that data!), but
+it was a nice stroll around quite a few problem domains.</p>
+
+<p>- <a href="http://mike.filespanker.com/">mieko</a></p>
+
+<h2>
+<a name="about-the-author" class="anchor" href="#about-the-author"><span class="octicon octicon-link"></span></a>About the Author</h2>
+
+<p>Mike is amazing, and sometimes accepts well-paying, remote, software gigs.</p>
+      </section>
+    </div>
+    <footer>
+      <p>Project maintained by <a href="https://github.com/mieko">mieko</a></p>
+      <p>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></p>
+    </footer>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+              <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-2490854-2");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+  </body>
+</html>
