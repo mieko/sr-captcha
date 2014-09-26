@@ -45,7 +45,7 @@ snippets of Ruby code.  I won't be publishing the API package, as:
 Tor
 ---
 The Silk Road was implemented as a TOR hidden service.  For my client API to
-connect to it and do anything useful, it has talk Tor.
+connect to it and do anything useful, it has to talk to Tor.
 
 [Vidalia](https://www.torproject.org/projects/vidalia.html.en) starts a local
 SOCKS5 proxy when launched.  My client needed to configure its HTTP agents to
