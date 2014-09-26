@@ -1,4 +1,4 @@
-Breaking The Silk Road Captcha
+Breaking the Silk Road's Captcha
 ==============================
 
 [Mike A. Owens](http://mike.filespanker.com/), August 24th, 2014
