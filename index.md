@@ -559,3 +559,7 @@ it was a nice stroll around a few problem domains.
 About the Author
 ----------------
 Mike is amazing, and sometimes accepts well-paying, remote, software gigs.
+
+ * [@leetliekmiek](https://twitter.com/leetliekmiek)
+ * [/u/miekao](http://www.reddit.com/user/miekao/)
+ * mike@filespanker.com
