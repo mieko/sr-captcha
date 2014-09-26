@@ -483,7 +483,7 @@ the dictionary?
 
 My first thought was to look into the network's "runner up" candidates.  But
 a different approach proved far more effective, as most errors were caused by bad 
-segmenting, not confusing similar looking letters.m
+segmenting, not confusing similar looking letters.
 
 Here's an interesting table:
 ```ruby
