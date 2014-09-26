@@ -320,7 +320,7 @@ being a good visualization.
 
 Think of it as a histogram.  Darker areas are where the segmentation algorithm
 sliced the characters in such a way that they "agreed".  You can see offsets
-where the pre-processing occasioanally allowed some things slip through the
+where the pre-processing occasionally allowed some things slip through the
 thresholds, too.
 
 We also see how minor the effect of the tiny rotations had on the representation 
