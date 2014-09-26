@@ -318,7 +318,7 @@ being a good visualization.
 
 ![The extracted "font"](./images/font-extracted.png)
 
-Think of it as a histogram.  Darker areas are where my segmentation algorithm
+Think of it as a histogram.  Darker areas are where the segmentation algorithm
 sliced the characters in such a way that they "agreed".  You can see offsets
 where the pre-processing occasioanally allowed some things slip through the
 thresholds, too.
@@ -477,7 +477,8 @@ But how do I fix "weird" candidate solutions, and words that didn't appear in
 the dictionary?
 
 My first thought was to look into the network's "runner up" candidates.  But
-a different approach proved far more effective.
+a different approach proved far more effective, as most errors were caused by bad 
+segmenting, not confusing similar looking letters.m
 
 Here's an interesting table:
 ```ruby
