@@ -323,6 +323,11 @@ sliced the characters in such a way that they "agreed".  You can see offsets
 where the pre-processing occasioanally allowed some things slip through the
 thresholds, too.
 
+We also see how minor the effect of the tiny rotations had on the representation 
+of each character.  If captchas were generated with a more extreme range of
+rotations, it may have been worthwhile to rotate each character bitmap until 
+it settles on a minimum axis-aligned bounding box.  That'd straighten them up.
+
 On the whole, every one is pretty readable.  As the letters came from an English
 dictionary, common letters are better represented (darker) than those that occur
 less frequently in the language.  I use this to my advantage later.
