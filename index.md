@@ -11,6 +11,8 @@ in operation.  I doubt anything written here applies anymore, though.
 Regardless, I'd like to dive into some code I wrote years ago that I'm
 particularly fond of, but obviously reluctant to put on a resumé.
 
+(**Update**: Per requests, I've since [explored the captcha implementation at
+ "The Silk Road 2"](./silk-road-2.md).)
 
 Motivation
 ------------
