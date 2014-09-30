@@ -1,5 +1,5 @@
 Breaking the Silk Road's Captcha
-==============================
+================================
 
 [Mike A. Owens](http://mike.filespanker.com/), August 24th, 2014
 
@@ -132,7 +132,7 @@ would allow me to get a lot of mileage out of one successful login.
 I ended up being able to do a lot better than that.
 
 Because the Silk Road developers had to be paranoid, they couldn't use an
-external captcha service like ReCaptcha.  I'm not sure if the solution they used
+external captcha service like reCAPTCHA.  I'm not sure if the solution they used
 was hand-rolled, or if they employed a third-party library, but lets give it a
 look:
 
@@ -323,9 +323,9 @@ sliced the characters in such a way that they "agreed".  You can see offsets
 where the pre-processing occasionally allowed some things slip through the
 thresholds, too.
 
-We also see how minor the effect of the tiny rotations had on the representation 
+We also see how minor the effect of the tiny rotations had on the representation
 of each character.  If captchas were generated with a more extreme range of
-rotations, it may have been worthwhile to rotate each character bitmap until 
+rotations, it may have been worthwhile to rotate each character bitmap until
 it settles on a minimum axis-aligned bounding box.  That'd straighten them up.
 
 On the whole, every one is pretty readable.  As the letters came from an English
@@ -482,7 +482,7 @@ But how do I fix "weird" candidate solutions, and words that didn't appear in
 the dictionary?
 
 My first thought was to look into the network's "runner up" candidates.  But
-a different approach proved far more effective, as most errors were caused by bad 
+a different approach proved far more effective, as most errors were caused by bad
 segmenting, not confusing similar looking letters.
 
 Here's an interesting table:
