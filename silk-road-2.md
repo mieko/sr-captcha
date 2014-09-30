@@ -166,11 +166,13 @@ Because the distortion is so minor, I just skipped this, and hoped probability
 worked in my favor down the road.
 
 Better Segmenting (Object Extraction)
------------------
+-------------------------------------
 
 Notice that, versus SR1, these captcha characters aren't spaced far apart.  It's
 as if they're oddly kerned.  Check out the horizontal overlap between the
-`T` and `J` of the last example, `XCUTJ`.  
+`T` and `J` of the last example, `XCUTJ`.
+
+![Can't vertically segment](./images/sr2/cant-seg.png)
 
 The segmentation method presented in the original article would fail on this, as
 it only looks for blank vertical lines.  It fails almost *half* the time.
