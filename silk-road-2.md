@@ -168,9 +168,9 @@ worked in my favor down the road.
 Better Segmenting (Object Extraction)
 -------------------------------------
 
-Notice that, versus SR1, these captcha characters aren't spaced far apart.  It's
-as if they're oddly kerned.  Check out the horizontal overlap between the
-`T` and `J` of the last example, `XCUTJ`.
+Notice that, unlike SR1, these captcha characters aren't spaced far apart.  It's
+as if they're oddly [kerned](http://en.wikipedia.org/wiki/Kerning).  Check out
+the horizontal overlap between the `T` and `J` of the last example, `XCUTJ`:
 
 ![Can't vertically segment](./images/sr2/cant-seg.png)
 
