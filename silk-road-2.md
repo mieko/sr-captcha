@@ -204,7 +204,8 @@ cases like they do).
 
 We want to remove the character we just extracted, so that the next time
 we run Marching Squares on it, we'll get the next character.  Or generate a new
-set of coordinates that'd point to the next "object".
+set of coordinates that'd point to the next "object", which is non-trivial if
+you have a strict concept of "next".
 
 This gets quite complicated outside of a graphics library.  Besides, per-pixel
 bitmap operations are slow *(really slow)* in Ruby.  Let's find something simpler.
