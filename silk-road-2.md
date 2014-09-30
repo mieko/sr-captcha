@@ -256,7 +256,7 @@ displayed:
 | Step                                                                  | Example                                                |
 | ----------------------------------------------------------------------|--------------------------------------------------------|
 | Original image, (monochrome for simplicity)                           | ![Original image, monochrome](./images/sr2/comp-1.png) |
-| Flood fill at first black pixel                                       | ![Flood-filled](./images/sr2/comp-2.png)               |
+| Flood fill at first left-most black pixel                             | ![Flood-filled](./images/sr2/comp-2.png)               |
 | Find the difference between the original and the flood-filled version | ![Differences](./images/sr2/comp-3.png)                |
 | Invert to get the character by itself.                                | ![Singled-out](./images/sr2/comp-4.png)                |
 
