@@ -319,5 +319,5 @@ Mike is (still) amazing, and sometimes accepts well-paying, remote, software
 gigs.
 
  * [@leetliekmiek](https://twitter.com/leetliekmiek)
- * [/u/miekao](http://www.reddit.com/user/miekao/)
+ * [/u/miekao](https://www.reddit.com/user/miekao/)
  * mike@filespanker.com
