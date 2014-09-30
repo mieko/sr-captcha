@@ -174,10 +174,10 @@ the horizontal overlap between the `T` and `J` of the last example, `XCUTJ`:
 
 ![Can't vertically segment](./images/sr2/cant-seg.png)
 
-The segmentation method presented in the original article would fail on this, as
-it only looks for blank vertical lines.  It fails almost *half* the time.
-
-We need a less naive algorithm to extract individual characters.
+The segmentation method presented in the original article would fail to segment
+these two characters, as it only looks for blank vertical lines.  It fails
+almost *half* the time.  We need a less naive algorithm to extract individual
+characters.
 
 ### Aside: Marching Squares?
 
@@ -186,9 +186,14 @@ can trace objects in a bitmap.  (Here are [Ruby](https://gist.github.com/mieko/d
 and [C++](https://gist.github.com/mieko/3c17c41b8be9f2598c12) implementations I
 just ripped out of a toy I wrote years ago.)
 
-The idea is, you let it loose on a monochrome bitmap, and it'll walk around the
-first object it gets to, and return it as an array of points.  If you combine
-that with a path simplification pass, like the [Douglas Peucker algorithm](http://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm),
+Phillip Spiess has [the best write-up](http://devblog.phillipspiess.com/better%20know%20an%20algorithm/2010/02/23/better-know-marching-squares.html)
+I've seen on this, so I've stolen his animation:
+
+![Marching Squares Animation by Phillip Spiess](./images/sr2/marchingmario.gif)
+
+The idea is, you let it loose on a bitmap, and it'll walk around the first
+object it gets to, and return it as an array of points.  If you combine that
+with a path simplification pass, like the [Douglas Peucker algorithm](http://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm),
 you've got a pretty reasonable polygon.  ([Here's an implementation I
 transliterated into Ruby for the same project](https://gist.github.com/mieko/7c1f5a3b51423c4322e2).)
 
