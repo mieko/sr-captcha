@@ -1,4 +1,4 @@
-Breaking the Silk Road's Captcha, Addendum 1: The Silk Road 2 Captcha
+Breaking The Silk Road's Captcha Redux: The Silk Road 2
 =====================================================================
 
 [Mike A. Owens](http://mike.filespanker.com/), September 30th, 2014
