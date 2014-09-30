@@ -250,8 +250,21 @@ def each_extracted_object(im)
 end
 ```
 
-All of that stuff runs at near-native speed because we're leaning on
-ImageMagick for the heavy lifting.
+Visually, it'd look something like the following, with the intermediate steps
+displayed:
+
+| Step                                                                  | Example                                                |
+| ----------------------------------------------------------------------|--------------------------------------------------------|
+| Original image, (monochrome for simplicity)                           | ![Original image, monochrome](./images/sr2/comp-1.png) |
+| Flood fill at first black pixel                                       | ![Flood-filled](./images/sr2/comp-2.png)               |
+| Find the difference between the original and the flood-filled version | ![Differences](./images/sr2/comp-3.png)                |
+| Invert to get the character by itself.                                | ![Singled-out](./images/sr2/comp-4.png)                |
+
+The result of step 2 is now our working image to extract the next character from,
+and the result of step four should have the isolated character.
+
+All of that stuff runs at near-native speed because we're leaning on ImageMagick
+for the heavy lifting.
 
 Pattern Matching
 ----------------
