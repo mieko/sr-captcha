@@ -556,6 +556,9 @@ I considered it solved and called it a day.
 The experiment didn't end up going much further (and I don't have that data!), but
 it was a nice stroll around a few problem domains.
 
+(**Note**: Also check out [Breaking The Silk Road's Captcha Redux: The Silk Road 2](./silk-road-2.md).)
+
+
 \- [mieko](http://mike.filespanker.com/)
 
 About the Author
