@@ -266,6 +266,13 @@ from, and the result of step four should have the isolated character.
 All of that stuff runs at near-native speed because we're leaning on ImageMagick
 for the heavy lifting.
 
+Note that this method (along with Marching Squares) would fail if any character
+in the character set consisted of more than one flood-fillable object.  For
+example, the dot and stem combo of a lower-case `i` or `j`.  In that case, it'd
+probably be easiest to totally discard extracted objects that don't hit minimum
+dimensions.  Another approach would be to extract all objects, and combine those
+that completely overlap on the x axis.
+
 
 Pattern Matching
 ----------------
